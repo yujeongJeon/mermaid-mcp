@@ -64,7 +64,11 @@ Claude Desktop의 `claude_desktop_config.json`에 추가하세요:
 {
     "mcpServers": {
         "mermaid-mcp": {
-            "command": "mermaid-mcp",
+            "command": "npx",
+            "args": [
+                "-y",
+                "mermaid-mcp"
+            ],
             "env": {
                 "MCP_LLM_PROVIDER": "anthropic",
                 "ANTHROPIC_API_KEY": "your-api-key-here",
