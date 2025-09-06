@@ -24,7 +24,7 @@ mermaid-mcp is a Model Context Protocol (MCP) server that analyzes your TypeScri
 
 ### Planned Features
 
--   **Flow Diagrams**: Visualize function call flows and execution paths
+-   **Flow Charts**: Visualize function call flows and execution paths
 -   **Import Maps**: Show module dependencies and import relationships
 -   **Sequence Diagrams**: Display method interactions and API flows
 
@@ -173,3 +173,9 @@ MIT
 
 -   This usually happens when `tsconfig.json` is missing or invalid
 -   The tool will fall back to basic analysis in this case
+
+### Roadmap (2025.09)
+
+- [ ] Deployment
+- [ ] Refactoring considering scalability
+- [ ] Add an import map generation tool
