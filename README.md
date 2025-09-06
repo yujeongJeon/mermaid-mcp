@@ -1,5 +1,7 @@
 # 🧜‍♀️ mermaid-mcp
 
+> language: **English** | [Korean](./README.ko.md)
+
 Generate Mermaid UML diagrams from code in any MCP-compatible AI tool (Claude Desktop, Cursor, etc.)
 
 ## Overview
