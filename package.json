@@ -1,0 +1,55 @@
+{
+    "name": "mermaid-mcp",
+    "version": "1.0.0",
+    "description": "A MCP server to generate mermaid diagrams based on user input and code.",
+    "keywords": [
+        "mermaid",
+        "mcp"
+    ],
+    "license": "MIT",
+    "author": "yujeongJeon <workingnewjeong@gmail.com>",
+    "type": "module",
+    "main": "index.js",
+    "scripts": {
+        "build": "tsup",
+        "format": "prettier --write .",
+        "lint": "eslint . --ext .js,.ts",
+        "lint:fix": "eslint . --ext .js,.ts --fix",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "@anthropic-ai/sdk": "^0.61.0",
+        "eslint": "^9.35.0",
+        "fastmcp": "^3.15.2",
+        "minimatch": "^10.0.3",
+        "openai": "^5.19.1",
+        "ts-morph": "^26.0.0",
+        "typescript": "^5.9.2",
+        "zod": "^3.25.76"
+    },
+    "devDependencies": {
+        "@naverpay/eslint-config": "^2.3.1",
+        "@naverpay/prettier-config": "^1.0.1",
+        "@types/node": "^24.3.1",
+        "@typescript-eslint/eslint-plugin": "^8.42.0",
+        "@typescript-eslint/parser": "^8.42.0",
+        "tsup": "^8.5.0"
+    },
+    "packageManager": "pnpm@10.6.5",
+    "engines": {
+        "node": "22.14.0",
+        "pnpm": "10.6.5"
+    },
+    "tsup": {
+        "entry": [
+            "src/index.ts"
+        ],
+        "format": [
+            "esm"
+        ],
+        "dts": true,
+        "splitting": true,
+        "sourcemap": true,
+        "clean": true
+    }
+}

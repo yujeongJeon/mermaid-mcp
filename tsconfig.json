@@ -1,0 +1,31 @@
+{
+  "compilerOptions": {
+    // ESM 설정
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "target": "es2020",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    
+    // 출력 설정
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+
+    
+    // 기타 설정
+    "skipLibCheck": true,
+    
+    // 라이브러리 설정
+    "lib": ["ES2022", "DOM"],
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+  ]
+}
