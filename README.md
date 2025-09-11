@@ -1,4 +1,4 @@
-# 🧜‍♀️ mermaid-mcp
+# 🧜‍♀️ business-mermaid-mcp
 
 > language: **English** | [Korean](./README.ko.md)
 
