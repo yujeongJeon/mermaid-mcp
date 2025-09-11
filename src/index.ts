@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
+import {exec} from 'child_process'
 import fs from 'fs/promises'
 import path from 'path'
+import {promisify} from 'util'
 
 import Anthropic from '@anthropic-ai/sdk'
 import {FastMCP} from 'fastmcp'
@@ -107,6 +109,24 @@ const classInputSchema = z.object({
 })
 type ClassInputSchema = z.infer<typeof classInputSchema>
 
+const execAsync = promisify(exec)
+
+const isGitInstalled = async () => {
+    try {
+        await execAsync('git --version')
+        return true
+    } catch {
+        return false
+    }
+}
+
+const getProjectRoot = async () => {
+    if (await isGitInstalled()) {
+        throw new Error('Git is not installed or not available in PATH. Please specify projectPath manually.')
+    }
+    const {stdout} = await execAsync('git rev-parse --show-toplevel')
+    return stdout.trim()
+}
 server.addTool({
     name: 'generate-class-diagram',
     description: 'Generate class diagram showing direct relationships of target class only',
@@ -115,11 +135,8 @@ server.addTool({
         try {
             console.error(`Searching for class "${params.targetClass}"...`)
 
-            const targetClassFile = await findTargetClass(
-                params.projectPath,
-                params.targetClass,
-                params.excludePatterns,
-            )
+            const rootPath = params.projectPath || (await getProjectRoot())
+            const targetClassFile = await findTargetClass(rootPath, params.targetClass, params.excludePatterns)
 
             if (!targetClassFile) {
                 throw new Error(`Class "${params.targetClass}" not found in project`)
