@@ -3,8 +3,7 @@ import {findTargetClass} from './class-analyzer.js'
 import {ClassRelationShipAnalyzer} from './class-relationship-analyzer.js'
 import {createAgent} from '../../helpers/agents/AgentFactory.js'
 import {getProjectRoot} from '../../helpers/git/GitUtils.js'
-
-import type {ClassInputSchema} from '../schema.js'
+import {classInputSchema, type ClassInputSchema} from '../schema.js'
 
 export async function executeClassDiagram(params: ClassInputSchema) {
     try {
@@ -65,4 +64,12 @@ ${analysis.relationships.map((rel) => `- ${rel.from} ${rel.type} ${rel.to}`).joi
     } catch (error) {
         throw new Error(`Failed to generate class diagram: ${error.message}`)
     }
+}
+
+// Tool definition for registry
+export const classDiagramTool = {
+    name: 'generate-class-diagram',
+    description: 'Generate class diagram showing direct relationships of target class only',
+    parameters: classInputSchema,
+    execute: executeClassDiagram,
 }

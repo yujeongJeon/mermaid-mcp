@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 import {FastMCP} from 'fastmcp'
 
-import {executeClassDiagram} from './tools/class-diagram/index.js'
-import {classInputSchema} from './tools/schema.js'
+import {createToolRegistry} from './tools/index.js'
 
 const server = new FastMCP({
     name: 'mermaid-mcp',
@@ -10,12 +9,9 @@ const server = new FastMCP({
     logger: console,
 })
 
-server.addTool({
-    name: 'generate-class-diagram',
-    description: 'Generate class diagram showing direct relationships of target class only',
-    parameters: classInputSchema,
-    execute: executeClassDiagram,
-})
+// Create and register all tools
+const registry = createToolRegistry()
+registry.registerAll(server)
 
 server.start({
     transportType: 'stdio',
