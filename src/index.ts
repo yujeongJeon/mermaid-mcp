@@ -126,6 +126,9 @@ async function analyzeDirectRelationships(
         relationships: [],
     }
 
+    // 클래스 분석 결과를 캐싱하기 위한 Map
+    const classCache = new Map<string, ClassInfo | null>()
+
     console.error('Analyzing target class...')
     analysis.targetClass = await analyzeClassFile(projectPath, targetClassFile.filePath, targetClassName, options)
 
@@ -133,36 +136,51 @@ async function analyzeDirectRelationships(
         throw new Error(`Failed to analyze target class ${targetClassName}`)
     }
 
+    classCache.set(targetClassName, analysis.targetClass)
+
+    async function getClassInfo(className: string): Promise<ClassInfo | null> {
+        if (classCache.has(className)) {
+            return classCache.get(className)!
+        }
+
+        const classFile = await findTargetClass(projectPath, className, options.excludePatterns)
+        if (!classFile) {
+            console.error(`Could not find file for class: ${className}`)
+            classCache.set(className, null)
+            return null
+        }
+
+        const classInfo = await analyzeClassFile(projectPath, classFile.filePath, className, options)
+        classCache.set(className, classInfo)
+
+        if (classInfo) {
+            console.error(`Successfully analyzed: ${className}`)
+        } else {
+            console.error(`Failed to analyze: ${className}`)
+        }
+
+        return classInfo
+    }
+
     // 합성 관계 분석 (includeComposes가 true일 때만)
     if (options.includeComposes) {
         console.error('Analyzing inheritance chain for compositions...')
         let currentClass = analysis.targetClass
         while (currentClass?.extends) {
-            const parentClassFile = await findTargetClass(projectPath, currentClass.extends, options.excludePatterns)
-            if (parentClassFile) {
-                const parentClass = await analyzeClassFile(
-                    projectPath,
-                    parentClassFile.filePath,
-                    currentClass.extends,
-                    options,
+            const parentClass = await getClassInfo(currentClass.extends)
+            if (parentClass) {
+                console.error(
+                    `Found parent class ${currentClass.extends} with ${parentClass.compositions.length} compositions`,
                 )
-                if (parentClass) {
-                    console.error(
-                        `Found parent class ${currentClass.extends} with ${parentClass.compositions.length} compositions`,
-                    )
-                    // 부모의 합성을 상속받은 합성으로 추가 (from과 to 정보 포함)
-                    parentClass.compositions.forEach((composition) => {
-                        analysis.targetClass!.inheritedCompositions.push({
-                            from: parentClass.name,
-                            to: composition,
-                        })
+                // 부모의 합성을 상속받은 합성으로 추가 (from과 to 정보 포함)
+                parentClass.compositions.forEach((composition) => {
+                    analysis.targetClass.inheritedCompositions.push({
+                        from: parentClass.name,
+                        to: composition,
                     })
-                    currentClass = parentClass
-                } else {
-                    break
-                }
+                })
+                currentClass = parentClass
             } else {
-                console.error(`Could not find parent class file: ${currentClass.extends}`)
                 break
             }
         }
@@ -191,26 +209,14 @@ async function analyzeDirectRelationships(
             }
             processedClasses.add(currentClassName)
 
-            let currentClassInfo: ClassInfo | null = null
-            if (currentClassName === targetClassName) {
-                currentClassInfo = analysis.targetClass
-            } else {
-                const classFile = await findTargetClass(projectPath, currentClassName, options.excludePatterns)
-                if (classFile) {
-                    currentClassInfo = await analyzeClassFile(
-                        projectPath,
-                        classFile.filePath,
-                        currentClassName,
-                        options,
-                    )
-                }
-            }
+            const currentClassInfo = await getClassInfo(currentClassName)
 
             if (!currentClassInfo) {
                 console.error(`Could not analyze class: ${currentClassName}`)
                 continue
             }
 
+            // 관련 클래스 수집
             if (currentClassInfo.extends) {
                 allRelatedClasses.add(currentClassInfo.extends)
                 nextLevelClasses.add(currentClassInfo.extends)
@@ -256,25 +262,24 @@ async function analyzeDirectRelationships(
         }
     }
 
+    // 타겟 클래스 제외
     allRelatedClasses.delete(targetClassName)
 
-    console.error(`Analyzing ${allRelatedClasses.size} related classes...`)
+    console.error(`Found ${allRelatedClasses.size} related classes to analyze`)
     console.error('Related class names:', Array.from(allRelatedClasses))
 
+    // 이미 처리된 클래스들은 제외하고, 캐시에 없는 클래스들만 분석
     for (const className of allRelatedClasses) {
-        console.error(`Looking for class: ${className}`)
-        const classFile = await findTargetClass(projectPath, className, options.excludePatterns)
-        if (classFile) {
-            console.error(`Found ${className} in: ${classFile.relativePath}`)
-            const classInfo = await analyzeClassFile(projectPath, classFile.filePath, className, options)
-            if (classInfo) {
-                analysis.relatedClasses.push(classInfo)
-                console.error(`Successfully analyzed: ${className}`)
-            } else {
-                console.error(`Failed to analyze: ${className}`)
-            }
-        } else {
-            console.error(`Could not find file for class: ${className}`)
+        if (!classCache.has(className)) {
+            await getClassInfo(className)
+        }
+    }
+
+    // 캐시에서 관련 클래스들 수집 (null이 아닌 것만)
+    for (const className of allRelatedClasses) {
+        const classInfo = classCache.get(className)
+        if (classInfo) {
+            analysis.relatedClasses.push(classInfo)
         }
     }
 
