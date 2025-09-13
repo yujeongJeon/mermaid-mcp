@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
-import {exec} from 'child_process'
 import fs from 'fs/promises'
 import path from 'path'
-import {promisify} from 'util'
 
 import {FastMCP} from 'fastmcp'
 import {minimatch} from 'minimatch'
-import {Project, SyntaxKind} from 'ts-morph'
+import {SyntaxKind} from 'ts-morph'
 import * as ts from 'typescript'
 import {z} from 'zod'
 
 import {createAgent} from './helpers/agents/AgentFactory.js'
+import {getProjectRoot} from './helpers/git/GitUtils.js'
+import {createProject} from './helpers/project/ProjectManager.js'
 
 import type {Analysis, ClassInfo, Relationship} from './types.js'
 
@@ -20,29 +20,6 @@ const server = new FastMCP({
     version: '1.0.0',
     logger: console,
 })
-
-async function createProject(projectPath: string) {
-    const tsConfigPath = path.join(projectPath, 'tsconfig.json')
-
-    try {
-        await fs.access(tsConfigPath)
-        return new Project({
-            tsConfigFilePath: tsConfigPath,
-        })
-    } catch {
-        console.error('tsconfig.json not found, using default configuration with allowJs: true')
-        return new Project({
-            compilerOptions: {
-                target: ts.ScriptTarget.ES2020,
-                module: ts.ModuleKind.CommonJS as any,
-                allowJs: true,
-                checkJs: false,
-                declaration: false,
-                strict: false,
-            },
-        })
-    }
-}
 
 const classInputSchema = z.object({
     projectPath: z
@@ -69,24 +46,6 @@ const classInputSchema = z.object({
 })
 type ClassInputSchema = z.infer<typeof classInputSchema>
 
-const execAsync = promisify(exec)
-
-const isGitInstalled = async () => {
-    try {
-        await execAsync('git --version')
-        return true
-    } catch {
-        return false
-    }
-}
-
-const getProjectRoot = async () => {
-    if (await isGitInstalled()) {
-        throw new Error('Git is not installed or not available in PATH. Please specify projectPath manually.')
-    }
-    const {stdout} = await execAsync('git rev-parse --show-toplevel')
-    return stdout.trim()
-}
 server.addTool({
     name: 'generate-class-diagram',
     description: 'Generate class diagram showing direct relationships of target class only',
