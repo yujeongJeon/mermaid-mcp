@@ -1,17 +1,16 @@
 #!/usr/bin/env node
 /* eslint-disable no-console */
-import fs from 'fs/promises'
 import path from 'path'
 
 import {FastMCP} from 'fastmcp'
 import {minimatch} from 'minimatch'
 import {SyntaxKind} from 'ts-morph'
-import * as ts from 'typescript'
 import {z} from 'zod'
 
 import {createAgent} from './helpers/agents/AgentFactory.js'
 import {getProjectRoot} from './helpers/git/GitUtils.js'
 import {createProject} from './helpers/project/ProjectManager.js'
+import {findTargetClass} from './tools/class-diagram/class-analyzer.js'
 
 import type {Analysis, ClassInfo, Relationship} from './types.js'
 
@@ -111,51 +110,6 @@ ${analysis.relationships.map((rel) => `- ${rel.from} ${rel.type} ${rel.to}`).joi
         }
     },
 })
-
-async function findTargetClass(projectPath: string, targetClassName: string, excludePatterns: string[]) {
-    const files = await scanProjectFiles(projectPath, excludePatterns)
-
-    for (const file of files) {
-        try {
-            const content = await fs.readFile(file, 'utf-8')
-
-            if (!content.includes(`class ${targetClassName}`)) {
-                continue
-            }
-
-            const sourceFile = ts.createSourceFile(
-                file,
-                content,
-                ts.ScriptTarget.Latest,
-                true,
-                file.endsWith('.tsx') || file.endsWith('.jsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS,
-            )
-
-            let found = false
-
-            function visit(node) {
-                if (ts.isClassDeclaration(node) && node.name?.text === targetClassName) {
-                    found = true
-                    return
-                }
-                ts.forEachChild(node, visit)
-            }
-
-            visit(sourceFile)
-
-            if (found) {
-                return {
-                    filePath: file,
-                    relativePath: path.relative(process.cwd(), file),
-                }
-            }
-        } catch (error) {
-            console.error(`Failed to check ${file}:`, error.message)
-        }
-    }
-
-    return null
-}
 
 async function analyzeDirectRelationships(
     projectPath: string,
@@ -598,38 +552,6 @@ function generateRelationships(targetClass: ClassInfo | null) {
     }
 
     return relationships
-}
-
-async function scanProjectFiles(projectPath, excludePatterns) {
-    const files = []
-
-    async function scanDirectory(dirPath) {
-        const entries = await fs.readdir(dirPath, {withFileTypes: true})
-
-        for (const entry of entries) {
-            const fullPath = path.join(dirPath, entry.name)
-            const relativePath = path.relative(projectPath, fullPath)
-
-            const defaultExcludes = ['node_modules', '.git', 'dist', 'build']
-            if (defaultExcludes.includes(entry.name) || entry.name.startsWith('.')) {
-                continue
-            }
-
-            const shouldExclude = excludePatterns.some(
-                (pattern) =>
-                    minimatch(relativePath, pattern, {dot: true}) || minimatch(entry.name, pattern, {dot: true}),
-            )
-
-            if (entry.isDirectory() && !shouldExclude) {
-                await scanDirectory(fullPath)
-            } else if (entry.isFile() && /\.(js|jsx|ts|tsx)$/.test(entry.name) && !shouldExclude) {
-                files.push(fullPath)
-            }
-        }
-    }
-
-    await scanDirectory(projectPath)
-    return files
 }
 
 function analyzeMorphMethod(method, options) {
