@@ -1,6 +1,6 @@
 {
     "name": "business-mermaid-mcp",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "description": "A MCP server to generate mermaid diagrams based on user input and code.",
     "keywords": [
         "mermaid",
