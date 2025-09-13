@@ -176,5 +176,4 @@ MIT
 
 ### Roadmap (2025.09)
 
-- [ ] Refactoring considering scalability
 - [ ] Add an import map generation tool
