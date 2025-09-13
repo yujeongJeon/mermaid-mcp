@@ -1,6 +1,6 @@
 import {AnthropicAgent} from './AnthropicAgent.js'
+import {LLM_CONFIG} from './configs/llm-configs.js'
 import {OpenAIAgent} from './OpenAIAgent.js'
-import {LLM_CONFIG} from './prompts/configs/llm-configs.js'
 
 import type {DiagramAgent} from './types.js'
 
