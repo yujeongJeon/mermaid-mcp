@@ -1,14 +1,16 @@
-import fs from 'fs/promises'
+import fs from 'fs'
 import path from 'path'
 
 import {Project} from 'ts-morph'
 import * as ts from 'typescript'
 
-export async function createProject(projectPath: string): Promise<Project> {
+export function createProject(projectPath: string): Project {
     const tsConfigPath = path.join(projectPath, 'tsconfig.json')
 
     try {
-        await fs.access(tsConfigPath)
+        if (!fs.existsSync(tsConfigPath)) {
+            throw new Error(`${tsConfigPath} not found`)
+        }
         return new Project({
             tsConfigFilePath: tsConfigPath,
         })

@@ -16,6 +16,12 @@ export function getClassDiagramPrompts(language: 'en' | 'ko', targetClass: strin
 - 연관: ClassA --> ClassB
 - 의존성: ClassA ..> ClassB
 
+접근제한자:
+- \`+\` : public
+- \`-\` : private
+- \`#\` : protected
+- \`~\` : package/internal
+
 요구사항:
 1. ${targetClass}를 중심에 배치하고 시각적으로 강조
 2. 상속(extends), 구현(implements), 합성(composes), 사용(uses) 관계 표시  
