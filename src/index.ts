@@ -5,13 +5,13 @@ import fs from 'fs/promises'
 import path from 'path'
 import {promisify} from 'util'
 
-import Anthropic from '@anthropic-ai/sdk'
 import {FastMCP} from 'fastmcp'
 import {minimatch} from 'minimatch'
-import OpenAI from 'openai'
 import {Project, SyntaxKind} from 'ts-morph'
 import * as ts from 'typescript'
 import {z} from 'zod'
+
+import {createAgent} from './helpers/agents/AgentFactory.js'
 
 import type {Analysis, ClassInfo, Relationship} from './types.js'
 
@@ -43,46 +43,6 @@ async function createProject(projectPath: string) {
         })
     }
 }
-
-const LLMConfigSchema = z.object({
-    provider: z.enum(['openai', 'anthropic']),
-    apiKey: z.string().min(1, 'LLM API key is required'),
-    model: z.string().min(1, 'LLM model is required'),
-})
-
-function getLLMConfigFromEnv() {
-    try {
-        const provider = process.env.MCP_LLM_PROVIDER || process.env.provider
-        let apiKey = ''
-        if (provider === 'openai') {
-            apiKey = process.env.OPENAI_API_KEY || process.env.MCP_LLM_API_KEY || process.env.apiKey || ''
-        } else if (provider === 'anthropic') {
-            apiKey = process.env.ANTHROPIC_API_KEY || process.env.MCP_LLM_API_KEY || process.env.apiKey || ''
-        }
-        const model = process.env.MCP_LLM_MODEL || process.env.model || ''
-        return LLMConfigSchema.parse({provider, apiKey, model})
-    } catch (error) {
-        if (error instanceof z.ZodError) {
-            const issues = error.issues.map((issue) => {
-                switch (issue.path[0]) {
-                    case 'provider':
-                        return `Provider: ${issue.message}. Supported values: 'openai' or 'anthropic'...`
-                    case 'apiKey':
-                        return `API Key: ${issue.message}. Set OPENAI_API_KEY/ANTHROPIC_API_KEY...`
-                    case 'model':
-                        return `Model: ${issue.message}. Set MCP_LLM_MODEL or model...`
-                    default:
-                        return `Configuration error at ${issue.path.join('.')}: ${issue.message}`
-                }
-            })
-
-            throw new Error(`LLM configuration error:\n${issues.join('\n')}`)
-        }
-        throw error
-    }
-}
-
-const LLM_CONFIG = getLLMConfigFromEnv()
 
 const classInputSchema = z.object({
     projectPath: z
@@ -155,10 +115,8 @@ server.addTool({
 
             console.error(`Found ${analysis.relatedClasses.length} directly related classes`)
 
-            const diagram = await generateDiagramWithLLM(analysis, {
-                provider: LLM_CONFIG.provider,
-                apiKey: LLM_CONFIG.apiKey,
-                model: LLM_CONFIG.model,
+            const agent = createAgent()
+            const diagram = await agent.generateDiagram(analysis, {
                 targetClass: params.targetClass,
                 language: params.language,
             })
@@ -683,89 +641,6 @@ function generateRelationships(targetClass: ClassInfo | null) {
     return relationships
 }
 
-function getPrompts(language: 'en' | 'ko', targetClass: string) {
-    if (language === 'ko') {
-        return {
-            systemPrompt: `당신은 TypeScript/JavaScript 클래스 다이어그램 생성 전문가입니다.
-
-주어진 클래스 분석 데이터를 바탕으로 Mermaid 클래스 다이어그램을 생성하세요.
-
-참고: https://mermaid.js.org/syntax/classDiagram.html
-
-주요 관계 표현:
-- 상속: ChildClass --|> ParentClass
-- 구현: ConcreteClass ..|> Interface  
-- 합성: ClassA *-- ClassB (filled diamond)
-- 연관: ClassA --> ClassB
-- 의존성: ClassA ..> ClassB
-
-요구사항:
-1. ${targetClass}를 중심에 배치하고 시각적으로 강조
-2. 상속(extends), 구현(implements), 합성(composes), 사용(uses) 관계 표시  
-3. 1차 관계만 포함 (깊이 1)
-4. 관계 방향을 명확히 표시
-5. 합성 관계는 *-- (filled diamond)로 표시
-6. 심플하고 깔끔한 레이아웃
-7. classDiagram으로 시작하는 완전한 다이어그램 코드 생성`,
-            userPrefix: `"${targetClass}" 클래스의 직접적인 관계 다이어그램을 생성해주세요.`,
-        }
-    } else {
-        return {
-            systemPrompt: `You are a TypeScript/JavaScript class diagram generation expert.
-
-Generate a Mermaid class diagram based on the provided class analysis data.
-
-Reference: https://mermaid.js.org/syntax/classDiagram.html
-
-Key relationship representations:
-- Inheritance: ChildClass --|> ParentClass
-- Implementation: ConcreteClass ..|> Interface  
-- Composition: ClassA *-- ClassB (filled diamond)
-- Association: ClassA --> ClassB
-- Dependency: ClassA ..> ClassB
-
-Requirements:
-1. Place ${targetClass} at the center and visually emphasize it
-2. Show inheritance (extends), implementation (implements), composition (composes), and usage (uses) relationships
-3. Include only 1st level relationships (depth 1)
-4. Clearly indicate relationship directions
-5. Use *-- (filled diamond) for composition relationships
-6. Keep a simple and clean layout
-7. Generate complete diagram code starting with classDiagram`,
-            userPrefix: `Generate a direct relationship diagram for the "${targetClass}" class.`,
-        }
-    }
-}
-
-async function generateDiagramWithLLM(analysis: Analysis, {provider, apiKey, model, targetClass, language}) {
-    const {systemPrompt, userPrefix} = getPrompts(language, targetClass)
-
-    const userPrompt = `${userPrefix}
-
-Target Class: ${targetClass}
-
-Relationships:
-${JSON.stringify(analysis.relationships, null, 2)}
-
-Class Information:
-${JSON.stringify(
-    {
-        targetClass: analysis.targetClass,
-        relatedClasses: analysis.relatedClasses,
-    },
-    null,
-    2,
-)}`
-
-    if (provider === 'anthropic') {
-        return await callAnthropicAPI(systemPrompt, userPrompt, apiKey, model)
-    } else if (provider === 'openai') {
-        return await callOpenAiAPI(systemPrompt, userPrompt, apiKey, model)
-    } else {
-        throw new Error(`Unsupported LLM provider: ${provider}. Supported providers: anthropic, openai`)
-    }
-}
-
 async function scanProjectFiles(projectPath, excludePatterns) {
     const files = []
 
@@ -796,121 +671,6 @@ async function scanProjectFiles(projectPath, excludePatterns) {
 
     await scanDirectory(projectPath)
     return files
-}
-
-async function callAnthropicAPI(
-    systemPrompt,
-    userPrompt,
-    apiKey,
-    model,
-): Promise<{
-    mermaidDiagram: string
-    summary: string
-}> {
-    if (!apiKey) {
-        throw new Error('Anthropic API key is required but not provided')
-    }
-
-    const anthropic = new Anthropic({apiKey})
-
-    try {
-        const message = await anthropic.messages.create({
-            model,
-            max_tokens: 4000,
-            system: systemPrompt,
-            tools: [
-                {
-                    name: 'generate_class_diagram',
-                    description: 'Generate a mermaid class diagram with summary',
-                    input_schema: {
-                        type: 'object',
-                        properties: {
-                            mermaidDiagram: {
-                                type: 'string',
-                                description: 'Complete mermaid class diagram code starting with classDiagram',
-                            },
-                            summary: {
-                                type: 'string',
-                                description: 'Brief summary of the class relationships shown in the diagram',
-                            },
-                        },
-                        required: ['mermaidDiagram', 'summary'],
-                    },
-                },
-            ],
-            tool_choice: {type: 'tool', name: 'generate_class_diagram'},
-            messages: [{role: 'user', content: userPrompt}],
-        })
-
-        const toolUse = message.content.find((content) => content.type === 'tool_use')
-        if (!toolUse || toolUse.name !== 'generate_class_diagram') {
-            throw new Error('Expected tool_use response from Anthropic API')
-        }
-
-        const input = toolUse.input as {mermaidDiagram: string; summary: string}
-        return input
-    } catch (error) {
-        if (error.name === 'SyntaxError') {
-            throw new Error('Failed to parse JSON response from Anthropic API')
-        }
-        throw error
-    }
-}
-
-async function callOpenAiAPI(
-    systemPrompt,
-    userPrompt,
-    apiKey,
-    model,
-): Promise<{
-    mermaidDiagram: string
-    summary: string
-}> {
-    if (!apiKey) {
-        throw new Error('OpenAI API key is required but not provided')
-    }
-    const openai = new OpenAI({apiKey})
-
-    const completion = await openai.chat.completions.create({
-        model,
-        messages: [
-            {role: 'system', content: systemPrompt},
-            {role: 'user', content: userPrompt},
-        ],
-        max_tokens: 4000,
-        response_format: {type: 'json_object'},
-    })
-    if (
-        !completion.choices ||
-        !completion.choices[0] ||
-        !completion.choices[0].message ||
-        !completion.choices[0].message.content
-    ) {
-        throw new Error('Invalid response format from OpenAI API')
-    }
-    return safeParseJSON(completion.choices[0].message.content)
-}
-
-function safeParseJSON(text: string) {
-    try {
-        return JSON.parse(text)
-    } catch {
-        let cleanText = text.trim()
-
-        // ```json ... ``` 제거
-        cleanText = cleanText.replace(/^```json\s*\n?/, '').replace(/\n?```\s*$/, '')
-
-        // ``` ... ``` 제거
-        cleanText = cleanText.replace(/^```\s*\n?/, '').replace(/\n?```\s*$/, '')
-
-        cleanText = cleanText.trim()
-
-        try {
-            return JSON.parse(cleanText)
-        } catch {
-            throw new Error(`Failed to parse JSON response. Original text: ${text.substring(0, 200)}...`)
-        }
-    }
 }
 
 function analyzeMorphMethod(method, options) {
