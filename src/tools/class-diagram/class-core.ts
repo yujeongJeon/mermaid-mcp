@@ -161,17 +161,45 @@ export async function analyzeClassFile(
     // 속성 분석
     const properties = classDecl.getProperties()
     properties.forEach((property) => {
-        const propertyInfo = analyzeMorphProperty(property, options, classDecl)
-        if (propertyInfo) {
-            classInfo.properties.push(propertyInfo)
+        // 화살표 함수인지 확인
+        const initializer = property.getInitializer()
+        const isArrowFunction =
+            initializer &&
+            (initializer.getKindName() === 'ArrowFunction' || initializer.getKindName() === 'FunctionExpression')
 
-            // 합성 관계 분석: includeComposes가 true이고 필드 타입이 내부 클래스인 경우
-            if (
-                options.includeComposes &&
-                propertyInfo.type &&
-                isCompositionRelationship(propertyInfo, importedClasses)
-            ) {
-                classInfo.compositions.push(propertyInfo.type)
+        if (isArrowFunction) {
+            // 화살표 함수는 메서드로 처리
+            const scope = property.getScope() || 'public'
+            const name = property.getName()
+
+            // private 체크
+            const isPrivate = scope === 'private' || name.startsWith('_')
+            if (!options.includePrivate && isPrivate) {
+                return
+            }
+
+            const methodInfo = {
+                name,
+                visibility: scope as 'public' | 'protected' | 'private',
+                isStatic: property.isStatic(),
+                isAbstract: false, // 화살표 함수는 abstract일 수 없음
+            }
+
+            classInfo.methods.push(methodInfo)
+        } else {
+            // 일반 속성으로 처리
+            const propertyInfo = analyzeMorphProperty(property, options, classDecl)
+            if (propertyInfo) {
+                classInfo.properties.push(propertyInfo)
+
+                // 합성 관계 분석: includeComposes가 true이고 필드 타입이 내부 클래스인 경우
+                if (
+                    options.includeComposes &&
+                    propertyInfo.type &&
+                    isCompositionRelationship(propertyInfo, importedClasses)
+                ) {
+                    classInfo.compositions.push(propertyInfo.type)
+                }
             }
         }
     })
