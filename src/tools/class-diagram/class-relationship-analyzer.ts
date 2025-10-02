@@ -4,7 +4,7 @@ import {analyzeClassFile, findChildClasses, generateRelationships} from './class
 import {createProject} from '../../helpers/project/ProjectManager.js'
 
 import type {Analysis, ClassInfo} from '../../types.js'
-import type {ClassInputSchema} from '../schema.js'
+import type {ClassInputSchema} from './schema.js'
 import type {Project} from 'ts-morph'
 
 export class ClassRelationShipAnalyzer {

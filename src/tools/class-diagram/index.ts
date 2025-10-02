@@ -1,9 +1,9 @@
 /* eslint-disable no-console */
 import {findTargetClass} from './class-analyzer.js'
 import {ClassRelationShipAnalyzer} from './class-relationship-analyzer.js'
+import {classInputSchema, type ClassInputSchema} from './schema.js'
 import {createAgent} from '../../helpers/agents/AgentFactory.js'
 import {getProjectRoot} from '../../helpers/git/GitUtils.js'
-import {classInputSchema, type ClassInputSchema} from '../schema.js'
 
 export async function executeClassDiagram(params: ClassInputSchema) {
     try {

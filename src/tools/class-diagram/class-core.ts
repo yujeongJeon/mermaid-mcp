@@ -11,7 +11,7 @@ import {
 } from './class-utils.js'
 
 import type {ClassInfo, Relationship} from '../../types.js'
-import type {ClassInputSchema} from '../schema.js'
+import type {ClassInputSchema} from './schema.js'
 
 export async function findChildClasses(project: Project, targetClassName: string) {
     const childClasses: string[] = []
